@@ -2,7 +2,15 @@ import bcrypt from 'bcryptjs';
 import { Router, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import QRCode from 'qrcode';
-import db from '../db';
+import {
+  createUser,
+  findUserByEmail,
+  getLastPhoneVerification,
+  insertPhoneVerification,
+  insertQrLoginToken,
+  getQrLoginTokenWithUser,
+  markQrTokenUsed,
+} from '../db';
 import { requireAuth, AuthedRequest } from '../middleware/auth';
 
 const router = Router();
@@ -32,7 +40,7 @@ function generateQrCode(): string {
 }
 
 /** POST /api/auth/register — регистрация */
-router.post('/register', (req: Request, res: Response) => {
+router.post('/register', async (req: Request, res: Response) => {
   const { email, password, name } = req.body as { email?: string; password?: string; name?: string };
   if (!email || typeof email !== 'string' || !password || typeof password !== 'string') {
     return res.status(400).json({ error: 'Нужны email и password' });
@@ -43,35 +51,37 @@ router.post('/register', (req: Request, res: Response) => {
 
   const passwordHash = bcrypt.hashSync(password, SALT_ROUNDS);
   try {
-    const stmt = db.prepare(
-      'INSERT INTO users (email, password_hash, name) VALUES (?, ?, ?)'
-    );
-    const result = stmt.run(trimmedEmail, passwordHash, name?.trim() || null);
-    const row = db.prepare('SELECT id, email, password_hash, name, created_at FROM users WHERE id = ?').get(result.lastInsertRowid) as UserRow;
-    const token = jwt.sign({ userId: row.id }, JWT_SECRET, { expiresIn: '30d' });
-    res.status(201).json({ token, user: toUser(row) });
-  } catch (e: unknown) {
-    const err = e as { code?: string };
-    if (err.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+    const existing = await findUserByEmail(trimmedEmail);
+    if (existing) {
       return res.status(409).json({ error: 'Такой email уже зарегистрирован' });
     }
-    throw e;
+    const row = await createUser(trimmedEmail, passwordHash, name?.trim() || null);
+    const token = jwt.sign({ userId: row.id }, JWT_SECRET, { expiresIn: '30d' });
+    return res.status(201).json({ token, user: toUser(row) });
+  } catch (e) {
+    console.error('Register error', e);
+    return res.status(500).json({ error: 'Ошибка регистрации' });
   }
 });
 
 /** POST /api/auth/login — вход */
-router.post('/login', (req: Request, res: Response) => {
+router.post('/login', async (req: Request, res: Response) => {
   const { email, password } = req.body as { email?: string; password?: string };
   if (!email || typeof email !== 'string' || !password || typeof password !== 'string') {
     return res.status(400).json({ error: 'Нужны email и password' });
   }
   const trimmedEmail = email.trim().toLowerCase();
-  const row = db.prepare('SELECT id, email, password_hash, name, created_at FROM users WHERE email = ?').get(trimmedEmail) as UserRow | undefined;
-  if (!row || !bcrypt.compareSync(password, row.password_hash)) {
-    return res.status(401).json({ error: 'Неверный email или пароль' });
+  try {
+    const row = await findUserByEmail(trimmedEmail);
+    if (!row || !bcrypt.compareSync(password, row.password_hash)) {
+      return res.status(401).json({ error: 'Неверный email или пароль' });
+    }
+    const token = jwt.sign({ userId: row.id }, JWT_SECRET, { expiresIn: '30d' });
+    return res.json({ token, user: toUser(row) });
+  } catch (e) {
+    console.error('Login error', e);
+    return res.status(500).json({ error: 'Ошибка входа' });
   }
-  const token = jwt.sign({ userId: row.id }, JWT_SECRET, { expiresIn: '30d' });
-  res.json({ token, user: toUser(row) });
 });
 
 /** POST /api/auth/send-sms-code — отправить код подтверждения на телефон */
@@ -86,9 +96,9 @@ router.post('/send-sms-code', (req: Request, res: Response) => {
   const code = generateCode();
   const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // 5 минут
 
-  db.prepare(
-    'INSERT INTO phone_verifications (phone, code, expires_at) VALUES (?, ?, ?)'
-  ).run(normalized, code, expiresAt);
+  insertPhoneVerification(normalized, code, expiresAt).catch((e) =>
+    console.error('insertPhoneVerification error', e)
+  );
 
   // Здесь должна быть реальная отправка SMS через провайдера (Twilio, etc.).
   // Пока что просто логируем код в консоль для dev-сборки.
@@ -98,7 +108,7 @@ router.post('/send-sms-code', (req: Request, res: Response) => {
 });
 
 /** POST /api/auth/verify-sms-code — проверить код подтверждения */
-router.post('/verify-sms-code', (req: Request, res: Response) => {
+router.post('/verify-sms-code', async (req: Request, res: Response) => {
   const { phone, code } = req.body as { phone?: string; code?: string };
   if (!phone || typeof phone !== 'string' || !code || typeof code !== 'string') {
     return res.status(400).json({ error: 'Нужны номер телефона и код' });
@@ -109,11 +119,7 @@ router.post('/verify-sms-code', (req: Request, res: Response) => {
     return res.status(400).json({ error: 'Некорректные номер телефона или код' });
   }
 
-  const row = db
-    .prepare(
-      'SELECT phone, code, expires_at FROM phone_verifications WHERE phone = ? ORDER BY created_at DESC LIMIT 1'
-    )
-    .get(normalized) as { phone: string; code: string; expires_at: string } | undefined;
+  const row = await getLastPhoneVerification(normalized);
 
   if (!row) return res.status(400).json({ error: 'Код не найден, запросите новый' });
 
@@ -131,39 +137,24 @@ router.post('/verify-sms-code', (req: Request, res: Response) => {
 });
 
 /** POST /api/auth/qr/create — создать одноразовый QR-код для входа в этот аккаунт */
-router.post('/qr/create', requireAuth, (req: Request, res: Response) => {
+router.post('/qr/create', requireAuth, async (req: Request, res: Response) => {
   const { userId } = req as AuthedRequest;
   const code = generateQrCode();
   const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // 5 минут на сканирование
 
-  db.prepare(
-    'INSERT INTO qr_login_tokens (user_id, code, expires_at) VALUES (?, ?, ?)'
-  ).run(userId, code, expiresAt);
+  await insertQrLoginToken(userId, code, expiresAt);
 
-  res.json({ code, expiresAt });
+  return res.json({ code, expiresAt });
 });
 
 /** POST /api/auth/qr/consume — войти по QR-коду (на новом устройстве) */
-router.post('/qr/consume', (req: Request, res: Response) => {
+router.post('/qr/consume', async (req: Request, res: Response) => {
   const { code } = req.body as { code?: string };
   if (!code || typeof code !== 'string') {
     return res.status(400).json({ error: 'Нужен код' });
   }
 
-  const row = db
-    .prepare(
-      `SELECT q.user_id, q.code, q.expires_at, q.used_at, u.email, u.password_hash, u.name, u.created_at, u.id
-       FROM qr_login_tokens q
-       JOIN users u ON u.id = q.user_id
-       WHERE q.code = ?
-       ORDER BY q.created_at DESC
-       LIMIT 1`
-    )
-    .get(code) as (UserRow & {
-    code: string;
-    expires_at: string;
-    used_at: string | null;
-  }) | undefined;
+  const row = await getQrLoginTokenWithUser(code);
 
   if (!row) return res.status(400).json({ error: 'Код не найден' });
 
@@ -176,10 +167,10 @@ router.post('/qr/consume', (req: Request, res: Response) => {
     return res.status(400).json({ error: 'Код уже использован' });
   }
 
-  db.prepare('UPDATE qr_login_tokens SET used_at = datetime(\'now\') WHERE code = ?').run(code);
+  await markQrTokenUsed(code);
 
   const token = jwt.sign({ userId: row.id }, JWT_SECRET, { expiresIn: '30d' });
-  res.json({ token, user: toUser(row) });
+  return res.json({ token, user: toUser(row) });
 });
 
 /** GET /api/auth/qr/image/:code — PNG с QR по одноразовому коду */
@@ -187,11 +178,7 @@ router.get('/qr/image/:code', async (req: Request, res: Response) => {
   const code = req.params.code;
   if (!code) return res.status(400).json({ error: 'Нужен код' });
 
-  const row = db
-    .prepare(
-      'SELECT code, expires_at, used_at FROM qr_login_tokens WHERE code = ? ORDER BY created_at DESC LIMIT 1'
-    )
-    .get(code) as { code: string; expires_at: string; used_at: string | null } | undefined;
+  const row = await getQrLoginTokenWithUser(code);
 
   if (!row) return res.status(404).json({ error: 'Код не найден' });
 
