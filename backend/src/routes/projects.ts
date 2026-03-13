@@ -1,6 +1,10 @@
 import { Router, Request, Response } from 'express';
 
-import db from '../db';
+import {
+  listProjectsForUser,
+  insertProject,
+  type ProjectRow,
+} from '../db';
 import type { AuthedRequest } from '../middleware/auth';
 import { requireAuth } from '../middleware/auth';
 
@@ -42,18 +46,14 @@ function rowToJson(row: ProjectRow) {
 }
 
 /** GET /api/projects — список проектов текущего пользователя */
-router.get('/', requireAuth, (req: Request, res: Response) => {
+router.get('/', requireAuth, async (req: Request, res: Response) => {
   const { userId } = req as AuthedRequest;
-  const rows = db
-    .prepare(
-      'SELECT * FROM projects WHERE user_id = ? ORDER BY created_at DESC, id DESC'
-    )
-    .all(userId) as ProjectRow[];
-  res.json({ projects: rows.map(rowToJson) });
+  const rows = await listProjectsForUser(userId);
+  return res.json({ projects: rows.map(rowToJson) });
 });
 
 /** POST /api/projects — создать проект для текущего пользователя */
-router.post('/', requireAuth, (req: Request, res: Response) => {
+router.post('/', requireAuth, async (req: Request, res: Response) => {
   const { userId } = req as AuthedRequest;
   const {
     address,
@@ -86,32 +86,21 @@ router.post('/', requireAuth, (req: Request, res: Response) => {
   }
   const st = status === 'done' ? 'done' : 'active';
 
-  const stmt = db.prepare(
-    `INSERT INTO projects
-    (user_id, address, status, date_start, date_end, start_date_ymd, end_date_ymd,
-     cover_image_uri, plan_image_uri, client_name, client_phone, client_email)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  );
-  const result = stmt.run(
-    userId,
-    address.trim(),
-    st,
-    dateStart ?? null,
-    dateEnd ?? null,
-    startDateYmd ?? null,
-    endDateYmd ?? null,
-    coverImageUri ?? null,
-    planImageUri ?? null,
-    clientName ?? null,
-    clientPhone ?? null,
-    clientEmail ?? null
-  );
+  const row = await insertProject(userId, {
+    address: address.trim(),
+    status: st,
+    dateStart: dateStart ?? null,
+    dateEnd: dateEnd ?? null,
+    startDateYmd: startDateYmd ?? null,
+    endDateYmd: endDateYmd ?? null,
+    coverImageUri: coverImageUri ?? null,
+    planImageUri: planImageUri ?? null,
+    clientName: clientName ?? null,
+    clientPhone: clientPhone ?? null,
+    clientEmail: clientEmail ?? null,
+  });
 
-  const row = db
-    .prepare('SELECT * FROM projects WHERE id = ?')
-    .get(result.lastInsertRowid) as ProjectRow;
-
-  res.status(201).json(rowToJson(row));
+  return res.status(201).json(rowToJson(row));
 });
 
 export default router;

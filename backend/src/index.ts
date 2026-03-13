@@ -5,6 +5,7 @@ import weatherRouter from './routes/weather';
 import authRouter from './routes/auth';
 import projectsRouter from './routes/projects';
 import visualizeRouter from './routes/visualize';
+import { initDb } from './db';
 
 const app = express();
 const PORT = process.env.PORT ?? 3001;
@@ -22,22 +23,32 @@ app.use('/api/auth', authRouter);
 app.use('/api/projects', projectsRouter);
 app.use('/api/visualize', visualizeRouter);
 
-app.listen(PORT, () => {
-  console.log(`Backend running at http://localhost:${PORT}`);
-  console.log('  POST /api/auth/register');
-  console.log('  POST /api/auth/login');
-  console.log('  POST /api/auth/send-sms-code');
-  console.log('  POST /api/auth/verify-sms-code');
-  console.log('  POST /api/auth/qr/create');
-  console.log('  POST /api/auth/qr/consume');
-  console.log('  GET  /api/projects');
-  console.log('  POST /api/projects');
-  console.log('  POST /api/visualize');
-  console.log('  GET  /health');
-  console.log('  GET  /api/weather?lat=&lng=');
-  console.log('  GET  /api/map/objects?status=active|done');
-  console.log('  GET  /api/map/objects/:id');
-  console.log('  POST /api/map/objects');
-  console.log('  PATCH /api/map/objects/:id');
-  console.log('  DELETE /api/map/objects/:id');
-});
+async function start() {
+  try {
+    await initDb();
+    app.listen(PORT, () => {
+      console.log(`Backend running at http://localhost:${PORT}`);
+      console.log('  POST /api/auth/register');
+      console.log('  POST /api/auth/login');
+      console.log('  POST /api/auth/send-sms-code');
+      console.log('  POST /api/auth/verify-sms-code');
+      console.log('  POST /api/auth/qr/create');
+      console.log('  POST /api/auth/qr/consume');
+      console.log('  GET  /api/projects');
+      console.log('  POST /api/projects');
+      console.log('  POST /api/visualize');
+      console.log('  GET  /health');
+      console.log('  GET  /api/weather?lat=&lng=');
+      console.log('  GET  /api/map/objects?status=active|done');
+      console.log('  GET  /api/map/objects/:id');
+      console.log('  POST /api/map/objects');
+      console.log('  PATCH /api/map/objects/:id');
+      console.log('  DELETE /api/map/objects/:id');
+    });
+  } catch (e) {
+    console.error('Failed to init DB', e);
+    process.exit(1);
+  }
+}
+
+start();

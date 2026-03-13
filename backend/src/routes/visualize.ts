@@ -1,6 +1,4 @@
 import { Router, Request, Response } from 'express';
-
-import db from '../db';
 import type { AuthedRequest } from '../middleware/auth';
 import { requireAuth } from '../middleware/auth';
 

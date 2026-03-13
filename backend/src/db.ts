@@ -55,7 +55,7 @@ export type QrLoginTokenRow = {
 // SQLite (локальная разработка)
 // -----------------------------
 
-let sqliteDb: Database | null = null;
+let sqliteDb: any = null;
 
 function initSqlite() {
   if (sqliteDb) return;
