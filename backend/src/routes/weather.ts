@@ -30,7 +30,7 @@ router.get('/', async (req: Request, res: Response) => {
     if (!resp.ok) {
       return res.status(502).json({ error: 'Weather service unavailable' });
     }
-    const data = await resp.json();
+    const data: any = await resp.json();
     const cur = data.current;
     if (!cur) {
       return res.status(502).json({ error: 'Invalid weather response' });

@@ -1,4 +1,4 @@
-import { Router, Response } from 'express';
+import { Router, Request, Response } from 'express';
 
 import db from '../db';
 import type { AuthedRequest } from '../middleware/auth';
@@ -42,17 +42,19 @@ function rowToJson(row: ProjectRow) {
 }
 
 /** GET /api/projects — список проектов текущего пользователя */
-router.get('/', requireAuth, (req: AuthedRequest, res: Response) => {
+router.get('/', requireAuth, (req: Request, res: Response) => {
+  const { userId } = req as AuthedRequest;
   const rows = db
-    .prepare<ProjectRow>(
+    .prepare(
       'SELECT * FROM projects WHERE user_id = ? ORDER BY created_at DESC, id DESC'
     )
-    .all(req.userId) as ProjectRow[];
+    .all(userId) as ProjectRow[];
   res.json({ projects: rows.map(rowToJson) });
 });
 
 /** POST /api/projects — создать проект для текущего пользователя */
-router.post('/', requireAuth, (req: AuthedRequest, res: Response) => {
+router.post('/', requireAuth, (req: Request, res: Response) => {
+  const { userId } = req as AuthedRequest;
   const {
     address,
     status,
@@ -91,7 +93,7 @@ router.post('/', requireAuth, (req: AuthedRequest, res: Response) => {
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
   const result = stmt.run(
-    req.userId,
+    userId,
     address.trim(),
     st,
     dateStart ?? null,
@@ -106,7 +108,7 @@ router.post('/', requireAuth, (req: AuthedRequest, res: Response) => {
   );
 
   const row = db
-    .prepare<ProjectRow>('SELECT * FROM projects WHERE id = ?')
+    .prepare('SELECT * FROM projects WHERE id = ?')
     .get(result.lastInsertRowid) as ProjectRow;
 
   res.status(201).json(rowToJson(row));

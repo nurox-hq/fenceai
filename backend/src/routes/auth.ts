@@ -131,8 +131,8 @@ router.post('/verify-sms-code', (req: Request, res: Response) => {
 });
 
 /** POST /api/auth/qr/create — создать одноразовый QR-код для входа в этот аккаунт */
-router.post('/qr/create', requireAuth, (req: AuthedRequest, res: Response) => {
-  const userId = req.userId;
+router.post('/qr/create', requireAuth, (req: Request, res: Response) => {
+  const { userId } = req as AuthedRequest;
   const code = generateQrCode();
   const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // 5 минут на сканирование
 

@@ -1,4 +1,4 @@
-import { Router, Response } from 'express';
+import { Router, Request, Response } from 'express';
 
 import db from '../db';
 import type { AuthedRequest } from '../middleware/auth';
@@ -19,7 +19,7 @@ type VisualizeBody = {
 const GENAPI_URL = process.env.GENAPI_VISUALIZE_URL;
 
 /** POST /api/visualize — создать визуализацию для проекта/пользователя */
-router.post('/', requireAuth, async (req: AuthedRequest, res: Response) => {
+router.post('/', requireAuth, async (req: Request, res: Response) => {
   const {
     imageBase64,
     imageUrl,
@@ -29,6 +29,8 @@ router.post('/', requireAuth, async (req: AuthedRequest, res: Response) => {
     prompt,
     projectId,
   } = req.body as VisualizeBody;
+
+  const { userId } = req as AuthedRequest;
 
   if (!prompt || typeof prompt !== 'string') {
     return res.status(400).json({ error: 'prompt обязателен' });
@@ -59,7 +61,7 @@ router.post('/', requireAuth, async (req: AuthedRequest, res: Response) => {
           reference_image_url: referenceImageUrl,
           features: safeFeatures,
           user_prompt: prompt,
-          user_id: req.userId,
+          user_id: userId,
           project_id: projectId ?? null,
         }),
         signal: controller.signal,
