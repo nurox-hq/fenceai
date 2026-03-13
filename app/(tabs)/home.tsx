@@ -31,7 +31,6 @@ import { ObjectsMapView } from '@/components/map/ObjectsMapView';
 const FILTERS = [
   { id: 'viz', label: 'AI-Гид' },
   { id: 'map', label: 'Карта объектов' },
-  { id: 'catalog', label: 'Каталог' },
 ];
 
 export default function HomeScreen() {
@@ -74,9 +73,9 @@ export default function HomeScreen() {
   };
   const collapseSearch = () => setSearchExpanded(false);
 
-  const goVisualize = () => {
+  const openAssistant = () => {
     haptic.light();
-    router.push('/(tabs)/visualize');
+    router.push('/assistant');
   };
   const goProjects = () => {
     haptic.light();
@@ -159,7 +158,7 @@ export default function HomeScreen() {
           </View>
         </FadeInUp>
 
-        {/* Круг под фильтрами: при «Карта объектов» — карта в графитовых тонах со свечением и маркерами */}
+        {/* Круг под фильтрами: при «Карта объектов» — карта, при «AI‑Гид» — кнопка ассистента */}
         <FadeInUp delay={140}>
           <View style={styles.circleWrap}>
             {activeFilter === 'map' ? (
@@ -172,7 +171,6 @@ export default function HomeScreen() {
               >
                 <View style={styles.circleMapGlow} />
                 <View style={styles.circleMapPlaceholder}>
-                  {/* Псевдо-маркеры объектов на «карте» */}
                   <View style={[styles.mapMarker, styles.mapMarker1]} />
                   <View style={[styles.mapMarker, styles.mapMarker2]} />
                   <View style={[styles.mapMarker, styles.mapMarker3]} />
@@ -183,13 +181,15 @@ export default function HomeScreen() {
                 </View>
               </PressableScale>
             ) : (
-              <View
-                style={[
-                  styles.circle,
-                  activeFilter === 'viz' && { backgroundColor: '#69C5F8' },
-                ]}
-                pointerEvents="none"
-              />
+              <PressableScale
+                style={[styles.circle, { backgroundColor: '#69C5F8' }]}
+                onPress={openAssistant}
+              >
+                <View style={styles.circleMapPlaceholder}>
+                  <Ionicons name="sparkles-outline" size={56} color="#FFFFFF" />
+                  <Text style={styles.circleMapHint}>AI‑ассистент FenceAI</Text>
+                </View>
+              </PressableScale>
             )}
           </View>
         </FadeInUp>
@@ -230,22 +230,7 @@ export default function HomeScreen() {
           </View>
         </FadeInUp>
 
-        {/* Блок внизу */}
-        <FadeInUp delay={160}>
-          <View style={[styles.bottomCard, { backgroundColor: c.surface, borderColor: c.border }]}>
-            <Text style={[styles.bottomCardTitle, { color: c.text }]}>Недавнее</Text>
-            <Text style={[styles.bottomCardSub, { color: c.textSecondary }]}>
-              Последние визуализации и проекты появятся здесь
-            </Text>
-            <PressableScale
-              style={[styles.linkBtn, { borderColor: c.tint }]}
-              onPress={goProjects}
-            >
-              <Text style={[styles.linkBtnText, { color: c.tint }]}>Открыть проекты</Text>
-              <Ionicons name="arrow-forward" size={18} color={c.tint} />
-            </PressableScale>
-          </View>
-        </FadeInUp>
+        {/* Нижний блок пока убран по требованиям дизайна */}
       </ScrollView>
 
       <Modal visible={mapFullscreenVisible} animationType="slide" onRequestClose={() => setMapFullscreenVisible(false)}>

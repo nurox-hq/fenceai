@@ -1,4 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
@@ -24,9 +26,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PressableScale } from '@/components/ui/PressableScale';
 import Colors from '@/constants/Colors';
 import { getProjectById, Project } from '@/constants/projects';
+import { VISUALIZE_URL } from '@/constants/api';
 import { radius, spacing, tabBarFloating, typography } from '@/constants/Theme';
 import { useColorScheme } from '@/components/useColorScheme';
 import { useHaptic } from '@/hooks/useHaptic';
+import { useAuth } from '@/contexts/AuthContext';
 
 const PROJECT_TABS = [
   { id: 'info', label: 'Информация' },
@@ -92,11 +96,15 @@ export default function ProjectScreen() {
   const [visualPrompt, setVisualPrompt] = useState('');
   const [visualIsProcessing, setVisualIsProcessing] = useState(false);
   const [visualAddedToMedia, setVisualAddedToMedia] = useState(false);
+  const [visualBaseImage, setVisualBaseImage] = useState<string | null>(null);
+  const [visualResultSummary, setVisualResultSummary] = useState<string | null>(null);
+  const [visualError, setVisualError] = useState<string | null>(null);
   const theme = useColorScheme();
   const c = Colors[theme ?? 'light'];
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const haptic = useHaptic();
+  const { token } = useAuth();
 
   if (!project) {
     return (
@@ -152,21 +160,68 @@ export default function ProjectScreen() {
 
   const handleVisualPickFromMedia = () => {
     haptic.light();
-    // Для прототипа считаем, что во вкладке «Медиа» есть 3 исходных фото
-    setVisualSourcePhotos([0, 1, 2]);
     setVisualAddedToMedia(false);
-    setVisualStep(2);
+    setVisualResultSummary(null);
+    setVisualError(null);
+    (async () => {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') return;
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspectRatio: [4, 3],
+      });
+      if (!result.canceled && result.assets[0]) {
+        setVisualBaseImage(result.assets[0].uri);
+        setVisualSourcePhotos([0]);
+        setVisualStep(2);
+      }
+    })();
   };
 
-  const handleVisualStartProcessing = () => {
-    if (!visualPrompt.trim()) return;
+  const handleVisualStartProcessing = async () => {
+    if (!visualPrompt.trim() || !visualBaseImage || !token) return;
     haptic.light();
     setVisualIsProcessing(true);
+    setVisualError(null);
+    setVisualResultSummary(null);
     setVisualStep(4);
-    setTimeout(() => {
-      setVisualIsProcessing(false);
+    try {
+      const base64 = await FileSystem.readAsStringAsync(visualBaseImage, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      const res = await fetch(VISUALIZE_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          imageBase64: base64,
+          features: {
+            referenceStyle: visualReference,
+          },
+          prompt: visualPrompt.trim(),
+          projectId: project.id,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error ?? `Ошибка визуализации (${res.status})`);
+      }
+      const summary: string =
+        typeof data.visualization?.message === 'string'
+          ? data.visualization.message
+          : 'Визуализация успешно выполнена.';
+      setVisualResultSummary(summary);
       setVisualStep(5);
-    }, 1600);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Не удалось выполнить визуализацию';
+      setVisualError(msg);
+      setVisualStep(5);
+    } finally {
+      setVisualIsProcessing(false);
+    }
   };
 
   return (

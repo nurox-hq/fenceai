@@ -2,20 +2,19 @@ import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withDelay,
-  withRepeat,
-  withSequence,
-  withTiming,
+    useAnimatedStyle,
+    useSharedValue,
+    withRepeat,
+    withSequence,
+    withTiming
 } from 'react-native-reanimated';
 
 import { FadeIn } from '@/components/ui/FadeIn';
 import { FadeInUp } from '@/components/ui/FadeInUp';
 import { PressableScale } from '@/components/ui/PressableScale';
+import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 import { getShadow, radius, spacing, typography } from '@/constants/Theme';
-import { useColorScheme } from '@/components/useColorScheme';
 import { useHaptic } from '@/hooks/useHaptic';
 
 export default function VisualizeVideoScreen() {

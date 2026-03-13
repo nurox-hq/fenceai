@@ -442,20 +442,23 @@ export default function ProjectsScreen() {
             <View style={styles.headerLeftBtnWrap}>
               <PressableScale
                 style={[styles.searchCapsule, { backgroundColor: c.surface }, getShadow('sm') as object]}
-                onPress={() => haptic.light()}
+                onPress={() => {
+                  haptic.light();
+                  router.push('/notifications');
+                }}
               >
                 <Ionicons name="notifications-outline" size={24} color={c.text} />
-              <View
-                style={[
-                  styles.notificationBadge,
-                  {
-                    backgroundColor: hasNotifications ? '#D2E9D5' : c.textSecondary,
-                    borderColor: c.surface,
-                    borderWidth: 2,
-                    opacity: hasNotifications ? 1 : 0.6,
-                  },
-                ]}
-              />
+                <View
+                  style={[
+                    styles.notificationBadge,
+                    {
+                      backgroundColor: hasNotifications ? '#D2E9D5' : c.textSecondary,
+                      borderColor: c.surface,
+                      borderWidth: 2,
+                      opacity: hasNotifications ? 1 : 0.6,
+                    },
+                  ]}
+                />
               </PressableScale>
             </View>
             <View style={styles.headerButtons}>

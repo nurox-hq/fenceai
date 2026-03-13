@@ -15,6 +15,7 @@ import Colors from '@/constants/Colors';
 import { getShadow, radius, spacing, typography } from '@/constants/Theme';
 import { useColorScheme } from '@/components/useColorScheme';
 import { useHaptic } from '@/hooks/useHaptic';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function SettingsScreen() {
   const theme = useColorScheme();
@@ -22,6 +23,7 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const haptic = useHaptic();
+  const { signOut } = useAuth();
 
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [aiTipsEnabled, setAiTipsEnabled] = useState(true);
@@ -89,16 +91,23 @@ export default function SettingsScreen() {
         </View>
 
         <View style={[styles.sectionCard, { backgroundColor: c.surface }, getShadow('sm') as object]}>
-          <Text style={[styles.sectionTitle, { color: c.text }]}>Безопасность</Text>
-          <View style={styles.row}>
+          <Text style={[styles.sectionTitle, { color: c.text }]}>Аккаунт</Text>
+          <PressableScale
+            style={styles.row}
+            onPress={async () => {
+              haptic.medium();
+              await signOut();
+              router.replace('/login');
+            }}
+          >
             <View style={styles.rowTextWrap}>
-              <Text style={[styles.rowTitle, { color: c.text }]}>Биометрия</Text>
+              <Text style={[styles.rowTitle, { color: '#FF3B30' }]}>Выйти из аккаунта</Text>
               <Text style={[styles.rowSubtitle, { color: c.textSecondary }]}>
-                Face ID / Touch ID / Android
+                Завершить сессию на этом устройстве
               </Text>
             </View>
-            <Ionicons name="shield-checkmark-outline" size={22} color="#69C5F8" />
-          </View>
+            <Ionicons name="log-out-outline" size={22} color="#FF3B30" />
+          </PressableScale>
         </View>
       </ScrollView>
     </View>

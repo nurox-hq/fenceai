@@ -3,9 +3,9 @@ import { Image, StyleSheet, Text, View } from 'react-native';
 
 import { FadeInUp } from '@/components/ui/FadeInUp';
 import { PressableScale } from '@/components/ui/PressableScale';
+import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 import { getShadow, radius, spacing, typography } from '@/constants/Theme';
-import { useColorScheme } from '@/components/useColorScheme';
 import { useHaptic } from '@/hooks/useHaptic';
 
 const FENCE_NAMES: Record<string, string> = {

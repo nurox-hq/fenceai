@@ -1,6 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PressableScale } from '@/components/ui/PressableScale';
@@ -17,6 +19,8 @@ export default function ProfileScreen() {
   const haptic = useHaptic();
   const router = useRouter();
   const { user, signOut } = useAuth();
+  const [avatarUri, setAvatarUri] = useState<string | null>(null);
+  const [avatarMenuVisible, setAvatarMenuVisible] = useState(false);
 
   const handleLogout = () => {
     haptic.light();
@@ -66,19 +70,28 @@ export default function ProfileScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Круг с аватаркой по центру */}
-        <View style={styles.avatarWrap}>
+        <Pressable
+          style={styles.avatarWrap}
+          onPress={() => {
+            haptic.light();
+            setAvatarMenuVisible(true);
+          }}
+        >
           <View style={[styles.avatarRing, { backgroundColor: c.surface }, getShadow('sm') as object]}>
             <View style={[styles.avatarCircle, { backgroundColor: c.border }]}>
-              <Ionicons name="person" size={56} color={c.textSecondary} />
+              {avatarUri ? (
+                <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
+              ) : (
+                <Ionicons name="person" size={56} color={c.textSecondary} />
+              )}
             </View>
           </View>
-        </View>
+        </Pressable>
         <Text style={[styles.profileName, { color: c.text }]} numberOfLines={1}>
           {user?.name || user?.email || 'Профиль'}
         </Text>
-        {/* Карточка аккаунта */}
+        {/* Карточка аккаунта и телефона */}
         <View style={[styles.accountCard, { backgroundColor: c.surface }, getShadow('sm') as object]}>
-          <Text style={[styles.accountTitle, { color: c.text }]}>Аккаунт</Text>
           <View style={styles.accountRow}>
             <Text style={[styles.accountLabel, { color: c.textSecondary }]}>Имя</Text>
             <Text style={[styles.accountValue, { color: c.text }]}>
@@ -91,13 +104,68 @@ export default function ProfileScreen() {
               {user?.email || '—'}
             </Text>
           </View>
+          <View style={[styles.accountDivider, { borderBottomColor: c.border }]} />
+          <View style={styles.accountRowColumn}>
+            <Text style={[styles.accountLabel, { color: c.textSecondary }]}>Телефон</Text>
+            <Text style={[styles.accountValue, { color: c.text }]}>+7 (___) ___‑__‑__</Text>
+          </View>
+          <View style={styles.accountRowColumn}>
+            <Text style={[styles.accountLabel, { color: c.textSecondary }]}>Дополнительная информация</Text>
+            <Text style={[styles.accountValue, { color: c.textSecondary }]}>—</Text>
+          </View>
         </View>
 
-        <Pressable style={[styles.logoutBtn, { borderColor: c.border }]} onPress={handleLogout}>
-          <Ionicons name="log-out-outline" size={20} color={c.textSecondary} />
-          <Text style={[styles.logoutText, { color: c.textSecondary }]}>Выйти</Text>
-        </Pressable>
+        {/* Статистика проектов */}
+        <View style={[styles.statsCard, { backgroundColor: c.surface }, getShadow('sm') as object]}>
+          <View style={styles.statsRow}>
+            <View style={styles.statsCol}>
+              <Text style={[styles.statsLabel, { color: c.textSecondary }]}>Активно</Text>
+              <Text style={[styles.statsValue, { color: c.text }]}>0</Text>
+            </View>
+            <View style={styles.statsDivider} />
+            <View style={styles.statsCol}>
+              <Text style={[styles.statsLabel, { color: c.textSecondary }]}>Завершено</Text>
+              <Text style={[styles.statsValue, { color: c.text }]}>0</Text>
+            </View>
+          </View>
+        </View>
       </ScrollView>
+
+      <Modal
+        visible={avatarMenuVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAvatarMenuVisible(false)}
+      >
+        <Pressable
+          style={styles.avatarMenuOverlay}
+          onPress={() => setAvatarMenuVisible(false)}
+        >
+          <View style={[styles.avatarMenu, { backgroundColor: c.surface }]}>
+            <PressableScale
+              style={styles.avatarMenuItem}
+              onPress={async () => {
+                haptic.light();
+                const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+                if (status !== 'granted') return;
+                const result = await ImagePicker.launchImageLibraryAsync({
+                  mediaTypes: ['images'],
+                  allowsEditing: true,
+                  aspectRatio: [1, 1],
+                });
+                if (!result.canceled && result.assets[0]) {
+                  setAvatarUri(result.assets[0].uri);
+                }
+                setAvatarMenuVisible(false);
+              }}
+            >
+              <Text style={[styles.avatarMenuText, { color: c.text }]}>
+                {avatarUri ? 'Изменить фото профиля' : 'Добавить фото профиля'}
+              </Text>
+            </PressableScale>
+          </View>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -119,7 +187,7 @@ const styles = StyleSheet.create({
   },
   scroll: { flex: 1 },
   scrollContent: { alignItems: 'center', paddingHorizontal: spacing.md },
-  avatarWrap: { alignItems: 'center', justifyContent: 'center', marginTop: spacing.xl },
+  avatarWrap: { alignItems: 'center', justifyContent: 'center', marginTop: spacing.lg },
   avatarRing: {
     width: 120,
     height: 120,
@@ -134,17 +202,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  avatarImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+  },
   profileName: { ...typography.title, marginTop: spacing.md },
   accountCard: {
     width: '100%',
-    marginTop: spacing.xl,
+    marginTop: spacing.lg,
     borderRadius: radius.lg,
     padding: spacing.lg,
-  },
-  accountTitle: {
-    ...typography.label,
-    fontSize: 14,
-    marginBottom: spacing.md,
   },
   accountRow: {
     flexDirection: 'row',
@@ -160,16 +228,60 @@ const styles = StyleSheet.create({
     ...typography.bodySmall,
     fontSize: 14,
   },
-  logoutBtn: {
+  accountDivider: {
+    borderBottomWidth: 1,
+    marginVertical: spacing.md,
+  },
+  accountRowColumn: {
+    marginTop: spacing.sm,
+  },
+  statsCard: {
+    width: '100%',
+    marginTop: spacing.lg,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+  },
+  statsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    marginTop: spacing.xl,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    borderRadius: radius.lg,
-    borderWidth: 1,
+    justifyContent: 'space-between',
   },
-  logoutText: { ...typography.label },
+  statsCol: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statsDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: '#E0E6F0',
+    marginHorizontal: spacing.md,
+  },
+  statsLabel: {
+    ...typography.caption,
+    fontSize: 12,
+  },
+  statsValue: {
+    ...typography.headline,
+    fontSize: 18,
+    marginTop: 4,
+  },
+  avatarMenuOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  avatarMenu: {
+    minWidth: 260,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.sm,
+  },
+  avatarMenuItem: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+  },
+  avatarMenuText: {
+    ...typography.body,
+    fontSize: 15,
+  },
 });
