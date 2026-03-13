@@ -320,7 +320,7 @@ export async function listProjectsForUser(
 
   const db = ensureSqlite();
   const rows = db
-    .prepare<ProjectRow>(
+    .prepare(
       'SELECT * FROM projects WHERE user_id = ? ORDER BY created_at DESC, id DESC'
     )
     .all(userId) as ProjectRow[];
@@ -405,7 +405,7 @@ export async function insertProject(
     clientEmail
   );
   const row = db
-    .prepare<ProjectRow>('SELECT * FROM projects WHERE id = ?')
+    .prepare('SELECT * FROM projects WHERE id = ?')
     .get(info.lastInsertRowid) as ProjectRow;
   return row;
 }

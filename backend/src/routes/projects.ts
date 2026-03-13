@@ -10,23 +10,6 @@ import { requireAuth } from '../middleware/auth';
 
 const router = Router();
 
-type ProjectRow = {
-  id: number;
-  user_id: number;
-  address: string;
-  status: 'active' | 'done';
-  date_start: string | null;
-  date_end: string | null;
-  start_date_ymd: string | null;
-  end_date_ymd: string | null;
-  cover_image_uri: string | null;
-  plan_image_uri: string | null;
-  client_name: string | null;
-  client_phone: string | null;
-  client_email: string | null;
-  created_at: string;
-};
-
 function rowToJson(row: ProjectRow) {
   return {
     id: String(row.id),
